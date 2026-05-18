@@ -9,17 +9,6 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Build stage for SSR (optional, if you're using Inertia SSR)
-FROM node:22-alpine AS ssr-build
-
-WORKDIR /app
-
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-RUN npm run build:ssr || true
-
 # PHP stage
 FROM php:8.2-fpm-alpine
 
@@ -69,7 +58,6 @@ COPY . .
 
 # Copy built frontend from frontend stage
 COPY --from=frontend /app/public/build ./public/build
-COPY --from=ssr-build /app/bootstrap/ssr ./bootstrap/ssr || true
 
 # Create necessary directories
 RUN mkdir -p storage/logs storage/framework/{sessions,views,cache}
