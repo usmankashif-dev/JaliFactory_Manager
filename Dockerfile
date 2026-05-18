@@ -24,7 +24,9 @@ RUN apk add --no-cache \
     zip \
     unzip \
     composer \
-    nginx
+    nginx \
+    libxml2-dev \
+    icu-dev
 
 # Install PHP extensions
 RUN docker-php-ext-install \
@@ -34,7 +36,11 @@ RUN docker-php-ext-install \
     mbstring \
     zip \
     bcmath \
-    opcache
+    opcache \
+    fileinfo \
+    dom \
+    tokenizer \
+    intl
 
 # Configure PHP
 RUN { \
