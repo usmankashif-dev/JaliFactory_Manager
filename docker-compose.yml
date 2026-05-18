@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jali-factory-app
+    restart: unless-stopped
+    working_dir: /app
+    ports:
+      - "8000:8080"
+    environment:
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=base64:q57YsQYxcXiCiRbmoAReCub2G0r/LOg4hHBnii0C4Rk=
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_DATABASE=jali_factory_manager
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - CACHE_DRIVER=redis
+      - SESSION_DRIVER=database
+      - QUEUE_CONNECTION=redis
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD=null
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - jali-network
+    volumes:
+      - ./storage:/app/storage
+      - ./bootstrap/cache:/app/bootstrap/cache
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: jali-factory-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jali_factory_manager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - jali-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: jali-factory-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - jali-network
+    volumes:
+      - redis_data:/data
+
+networks:
+  jali-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

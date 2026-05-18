@@ -1,0 +1,61 @@
+services:
+  - type: web
+    name: jali-factory-manager
+    env: docker
+    dockerfilePath: ./Dockerfile
+    
+    # Build configuration
+    buildCommand: >
+      npm install &&
+      npm run build &&
+      composer install --no-dev --optimize-autoloader
+    
+    # Start command
+    startCommand: /app/start.sh
+    
+    # Port configuration
+    ports:
+      - port: 8080
+        protocol: HTTP
+    
+    # Environment variables
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: 'false'
+      - key: LOG_CHANNEL
+        value: stack
+      - key: APP_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_KEY
+        sync: false
+      - key: CACHE_DRIVER
+        value: redis
+      - key: SESSION_DRIVER
+        value: database
+      - key: QUEUE_CONNECTION
+        value: redis
+    
+    # Scaling
+    numInstances: 1
+    
+    # Health check
+    healthCheckPath: /
+    
+    # Maximum execution time (seconds)
+    maxExecutionTimeSeconds: 30
+    
+    # Disk size
+    disk:
+      name: data
+      mountPath: /app/storage
+      sizeGB: 5
+
+databases:
+  - name: postgres-db
+    databaseName: jali_factory_manager
+    user: postgres
+    ipAllowList: []
