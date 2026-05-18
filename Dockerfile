@@ -26,7 +26,8 @@ RUN apk add --no-cache \
     composer \
     nginx \
     libxml2-dev \
-    icu-dev
+    icu-dev \
+    $PHPIZE_DEPS
 
 # Install PHP extensions
 RUN docker-php-ext-install \
@@ -39,8 +40,8 @@ RUN docker-php-ext-install \
     opcache \
     fileinfo \
     dom \
-    tokenizer \
-    intl
+    intl \
+    session
 
 # Configure PHP
 RUN { \
