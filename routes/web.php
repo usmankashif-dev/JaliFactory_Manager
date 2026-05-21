@@ -52,7 +52,7 @@ Route::get('/orders/{id}', [AddmallController::class, 'newordersv'])->name('orde
 Route::get('/order', [AddmallController::class, 'showOrders'])->name('order-view');
 Route::delete('/order/{id}', [AddmallController::class, 'deleteOrder'])->name('order.delete');
 
-Route::get('/orders', [AddmallController::class, 'makestore'])->name('makeorder.show');
+Route::get('/orders', [AddmallController::class, 'makestore'])->name('makeorder.index');
 Route::post('/orders', [AddmallController::class, 'makestore'])->name('makeorder.store');
 Route::post('/orders/{id}', [AddmallController::class, 'makenewordersv'])->name('order.make');
 Route::get('/orders-list', [OrderController::class, 'index'])->name('orders.index');
