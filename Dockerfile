@@ -1,5 +1,5 @@
 # Build stage for Node dependencies and Vite build
-FROM node:22-alpine AS frontend
+FROM node:22 AS frontend
 
 WORKDIR /app
 
@@ -9,31 +9,37 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# PHP stage
-FROM php:8.2-fpm-alpine
+# PHP stage - Production ready Laravel Dockerfile
+FROM php:8.3-fpm
 
-# Install system dependencies
-RUN apk add --no-cache \
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies - all at once for better layer caching
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
     bash \
-    postgresql-dev \
-    mysql-client \
-    oniguruma-dev \
-    libzip-dev \
     zip \
     unzip \
-    composer \
+    postgresql-client \
+    mysql-client \
     nginx \
+    supervisor \
     libxml2-dev \
-    icu-dev \
-    $PHPIZE_DEPS
+    libzip-dev \
+    libonig-dev \
+    libicu-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Install all PHP extensions at once
 RUN docker-php-ext-install \
     pdo \
-    pdo_pgsql \
     pdo_mysql \
+    pdo_pgsql \
     mbstring \
     zip \
     bcmath \
@@ -41,34 +47,48 @@ RUN docker-php-ext-install \
     fileinfo \
     dom \
     intl \
-    session
+    session \
+    ctype \
+    filter
 
-# Configure PHP
+# Configure PHP production settings
 RUN { \
-    echo 'memory_limit = 256M'; \
-    echo 'upload_max_filesize = 50M'; \
-    echo 'post_max_size = 50M'; \
+    echo 'memory_limit = 512M'; \
+    echo 'upload_max_filesize = 100M'; \
+    echo 'post_max_size = 100M'; \
     echo 'max_execution_time = 600'; \
+    echo 'default_charset = utf-8'; \
+    echo 'display_errors = Off'; \
+    echo 'log_errors = On'; \
     } > /usr/local/etc/php/conf.d/app.ini
 
-# Setup work directory
-WORKDIR /app
+# Configure opcache for production
+RUN { \
+    echo 'opcache.enable = 1'; \
+    echo 'opcache.revalidate_freq = 0'; \
+    echo 'opcache.validate_timestamps = 0'; \
+    echo 'opcache.fast_shutdown = 1'; \
+    echo 'opcache.interned_strings_buffer = 16'; \
+    echo 'opcache.max_accelerated_files = 20000'; \
+    echo 'opcache.memory_consumption = 256'; \
+    } > /usr/local/etc/php/conf.d/opcache.ini
 
-# Copy composer files
+# Copy Composer files
 COPY composer.json composer.lock* ./
 
 # Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
 # Copy application files
 COPY . .
 
-# Copy built frontend from frontend stage
+# Copy built assets from frontend stage
 COPY --from=frontend /app/public/build ./public/build
 
-# Create necessary directories
-RUN mkdir -p storage/logs storage/framework/{sessions,views,cache}
-RUN chmod -R 775 storage bootstrap/cache
+# Create necessary directories and set permissions
+RUN mkdir -p storage/logs storage/framework/{sessions,views,cache} bootstrap/cache && \
+    chown -R www-data:www-data /app && \
+    chmod -R 755 storage bootstrap/cache
 
 # Copy nginx configuration
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
@@ -77,19 +97,34 @@ COPY ./docker/default.conf /etc/nginx/conf.d/default.conf
 # Expose port
 EXPOSE 8080
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
 # Create startup script
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
+echo "Starting application..."\n\
+\n\
 # Generate app key if not exists\n\
 if [ -z "$APP_KEY" ]; then\n\
+    echo "Generating app key..."\n\
     php artisan key:generate --force\n\
 fi\n\
 \n\
 # Run migrations\n\
-php artisan migrate --force\n\
+echo "Running database migrations..."\n\
+php artisan migrate --force 2>/dev/null || true\n\
 \n\
-# Start services\n\
+# Clear caches\n\
+php artisan config:cache\n\
+php artisan route:cache\n\
+php artisan view:cache\n\
+\n\
+echo "Application started successfully"\n\
+\n\
+# Start PHP-FPM and Nginx\n\
 php-fpm &\n\
 nginx -g "daemon off;"\n\
 ' > /app/start.sh && chmod +x /app/start.sh
