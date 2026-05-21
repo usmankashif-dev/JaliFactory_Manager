@@ -4,7 +4,7 @@ FROM node:22 AS frontend
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 RUN npm run build
@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libzip-dev \
     libonig-dev \
     libicu-dev \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
@@ -47,9 +48,7 @@ RUN docker-php-ext-install \
     fileinfo \
     dom \
     intl \
-    session \
-    ctype \
-    filter
+    ctype
 
 # Configure PHP production settings
 RUN { \
