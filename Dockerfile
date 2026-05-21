@@ -75,14 +75,22 @@ RUN { \
 # Copy Composer files
 COPY composer.json composer.lock* ./
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+# Install PHP dependencies without running scripts (artisan doesn't exist yet)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress --no-scripts
 
 # Copy application files
 COPY . .
 
+# Run Laravel package discovery now that artisan exists
+RUN php artisan package:discover --ansi || true
+
 # Copy built assets from frontend stage
 COPY --from=frontend /app/public/build ./public/build
+
+# Clear and optimize for production
+RUN php artisan config:cache --ansi 2>/dev/null || true && \
+    php artisan route:cache --ansi 2>/dev/null || true && \
+    php artisan view:cache --ansi 2>/dev/null || true
 
 # Create necessary directories and set permissions
 RUN mkdir -p storage/logs storage/framework/{sessions,views,cache} bootstrap/cache && \
