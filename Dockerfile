@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     unzip \
     postgresql-client \
-    mysql-client \
+    default-mysql-client \
     nginx \
     supervisor \
     libxml2-dev \
