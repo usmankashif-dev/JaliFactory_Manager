@@ -6,6 +6,7 @@ FROM node:22 AS frontend
 WORKDIR /app
 
 COPY package*.json ./
+
 RUN npm ci
 
 COPY . .
@@ -59,7 +60,7 @@ RUN docker-php-ext-install \
     intl \
     ctype
 
-# PHP Production Settings
+# PHP production settings
 RUN { \
     echo 'memory_limit=512M'; \
     echo 'upload_max_filesize=100M'; \
@@ -69,7 +70,7 @@ RUN { \
     echo 'log_errors=On'; \
 } > /usr/local/etc/php/conf.d/app.ini
 
-# Opcache Settings
+# Opcache settings
 RUN { \
     echo 'opcache.enable=1'; \
     echo 'opcache.validate_timestamps=0'; \
@@ -78,24 +79,25 @@ RUN { \
     echo 'opcache.interned_strings_buffer=16'; \
 } > /usr/local/etc/php/conf.d/opcache.ini
 
-# Copy Composer files
+# Copy composer files first
 COPY composer.json composer.lock* ./
 
-# Install Laravel dependencies
+# Install PHP dependencies
 RUN composer install \
     --no-dev \
     --optimize-autoloader \
     --no-interaction \
-    --no-progress
+    --no-progress \
+    --no-scripts
 
-# Copy application
+# Copy application files
 COPY . .
+
+# Run Laravel package discovery
+RUN php artisan package:discover --ansi
 
 # Copy built frontend assets
 COPY --from=frontend /app/public/build ./public/build
-
-# Package discovery
-RUN php artisan package:discover --ansi
 
 # Create Laravel directories
 RUN mkdir -p \
@@ -105,11 +107,11 @@ RUN mkdir -p \
     storage/logs \
     bootstrap/cache
 
-# Permissions
+# Set permissions
 RUN chown -R www-data:www-data /app && \
     chmod -R 775 storage bootstrap/cache
 
-# Copy Nginx configs
+# Copy nginx configuration
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/default.conf /etc/nginx/conf.d/default.conf
 
@@ -120,15 +122,11 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080 || exit 1
 
-# Startup script
+# Create startup script
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
 echo "Starting Laravel application..."\n\
-\n\
-if [ -z "$APP_KEY" ]; then\n\
-    php artisan key:generate --force\n\
-fi\n\
 \n\
 echo "Clearing caches..."\n\
 php artisan optimize:clear\n\
