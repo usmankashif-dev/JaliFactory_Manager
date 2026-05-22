@@ -1,5 +1,5 @@
 # =========================
-# Frontend Build Stage
+# Frontend build
 # =========================
 FROM node:22 AS frontend
 
@@ -9,20 +9,19 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-
 RUN npm run build
 
 
 # =========================
-# PHP Stage
+# PHP + Nginx
 # =========================
 FROM php:8.3-fpm
 
 WORKDIR /app
 
 # System deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl git bash zip unzip nginx supervisor \
+RUN apt-get update && apt-get install -y \
+    curl git zip unzip nginx supervisor \
     libpq-dev libzip-dev libicu-dev libonig-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,51 +30,26 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # PHP extensions
 RUN docker-php-ext-install \
-    pdo pdo_pgsql mbstring zip bcmath opcache intl
+    pdo pdo_pgsql mbstring zip bcmath intl opcache
 
 # Copy app
 COPY . .
 
-# Install PHP dependencies
+# Install PHP deps
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Frontend build
 COPY --from=frontend /app/public/build ./public/build
 
-# Permissions
-RUN mkdir -p storage bootstrap/cache \
-    && chmod -R 775 storage bootstrap/cache
-
-# Nginx configs
+# Nginx config
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/default.conf /etc/nginx/conf.d/default.conf
 
+# Copy startup script
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
+
 EXPOSE 8080
 
-# =========================
-# START SCRIPT (FIXED PROPERLY)
-# =========================
-RUN printf "%s\n" \
-"#!/bin/bash" \
-"set -e" \
-"" \
-"echo 'Waiting for DB...'" \
-"sleep 5" \
-"" \
-"echo 'Clearing cache...'" \
-"php artisan optimize:clear || true" \
-"" \
-"echo 'Running migrations...'" \
-"php artisan migrate --force || true" \
-"" \
-"echo 'Caching...'" \
-"php artisan config:cache" \
-"php artisan route:cache" \
-"php artisan view:cache" \
-"" \
-"echo 'Starting services...'" \
-"php-fpm -D" \
-"nginx -g 'daemon off;'" \
-> /app/start.sh && chmod +x /app/start.sh
+CMD ["/start.sh"]
 
-CMD ["/app/start.sh"]
