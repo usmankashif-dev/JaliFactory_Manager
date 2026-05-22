@@ -13,7 +13,7 @@ return new class extends Migration
     {
 Schema::create('orders', function (Blueprint $table) {
     $table->id();
-    $table->foreignId('mall_id')->nullable()->constrained('malls')->onDelete('set null');
+    $table->bigInteger('mall_id')->nullable();
     $table->string('orderedqty');
     $table->string('olenght');
     $table->string('peice');
