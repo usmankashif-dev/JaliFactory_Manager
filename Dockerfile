@@ -6,13 +6,11 @@ FROM node:22 AS frontend
 WORKDIR /app
 
 COPY package*.json ./
-
 RUN npm ci
 
 COPY . .
 
 ENV APP_URL=https://jalifactory-manager.onrender.com
-
 RUN npm run build
 
 
@@ -23,44 +21,23 @@ FROM php:8.3-fpm
 
 WORKDIR /app
 
-# Install system dependencies
+# System deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    git \
-    bash \
-    zip \
-    unzip \
-    nginx \
-    supervisor \
-    postgresql-client \
-    default-mysql-client \
-    libxml2-dev \
-    libzip-dev \
-    libonig-dev \
-    libicu-dev \
-    libpq-dev \
+    curl git bash zip unzip nginx supervisor \
+    postgresql-client default-mysql-client \
+    libxml2-dev libzip-dev libonig-dev libicu-dev libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Composer
+# Composer
 RUN curl -sS https://getcomposer.org/installer | php -- \
-    --install-dir=/usr/local/bin \
-    --filename=composer
+    --install-dir=/usr/local/bin --filename=composer
 
-# Install PHP extensions
+# PHP extensions
 RUN docker-php-ext-install \
-    pdo \
-    pdo_mysql \
-    pdo_pgsql \
-    mbstring \
-    zip \
-    bcmath \
-    opcache \
-    fileinfo \
-    dom \
-    intl \
-    ctype
+    pdo pdo_mysql pdo_pgsql mbstring zip bcmath \
+    opcache fileinfo dom intl ctype
 
-# PHP production settings
+# PHP config
 RUN { \
     echo 'memory_limit=512M'; \
     echo 'upload_max_filesize=100M'; \
@@ -70,7 +47,7 @@ RUN { \
     echo 'log_errors=On'; \
 } > /usr/local/etc/php/conf.d/app.ini
 
-# Opcache settings
+# Opcache
 RUN { \
     echo 'opcache.enable=1'; \
     echo 'opcache.validate_timestamps=0'; \
@@ -79,10 +56,10 @@ RUN { \
     echo 'opcache.interned_strings_buffer=16'; \
 } > /usr/local/etc/php/conf.d/opcache.ini
 
-# Copy composer files
+# Copy composer files first
 COPY composer.json composer.lock* ./
 
-# Install PHP dependencies
+# Install dependencies (NO artisan scripts yet)
 RUN composer install \
     --no-dev \
     --optimize-autoloader \
@@ -90,16 +67,16 @@ RUN composer install \
     --no-progress \
     --no-scripts
 
-# Copy application files
+# Copy full app
 COPY . .
 
-# Run Laravel package discovery
-RUN php artisan package:discover --ansi
+# NOW run artisan safely
+RUN php artisan package:discover --ansi || true
 
-# Copy built frontend assets
+# Copy frontend build
 COPY --from=frontend /app/public/build ./public/build
 
-# Create Laravel directories
+# Storage folders
 RUN mkdir -p \
     storage/framework/cache \
     storage/framework/sessions \
@@ -107,38 +84,34 @@ RUN mkdir -p \
     storage/logs \
     bootstrap/cache
 
-# Set permissions
 RUN chown -R www-data:www-data /app && \
     chmod -R 775 storage bootstrap/cache
 
-# Copy nginx configuration
+# Nginx config
 COPY ./docker/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker/default.conf /etc/nginx/conf.d/default.conf
 
-# Expose Render port
 EXPOSE 8080
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8080 || exit 1
 
-# Create startup script
+# =========================
+# START SCRIPT (FIXED)
+# =========================
 RUN echo '#!/bin/bash\n\
 set -e\n\
 \n\
-echo "Starting Laravel application..."\n\
-\n\
-echo "Creating database tables if needed..."\n\
-php artisan cache:table || true\n\
-php artisan session:table || true\n\
+echo "Clearing Laravel caches..."\n\
+php artisan config:clear || true\n\
+php artisan cache:clear || true\n\
+php artisan optimize:clear || true\n\
 \n\
 echo "Running migrations..."\n\
-php artisan migrate:fresh --force\n\
+php artisan migrate --force\n\
 \n\
-echo "Clearing caches..."\n\
-php artisan optimize:clear\n\
-\n\
-echo "Caching config/routes/views..."\n\
+echo "Caching app..."\n\
 php artisan config:cache\n\
 php artisan route:cache\n\
 php artisan view:cache\n\
