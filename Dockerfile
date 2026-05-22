@@ -133,7 +133,7 @@ php artisan cache:table || true\n\
 php artisan session:table || true\n\
 \n\
 echo "Running migrations..."\n\
-php artisan migrate --force\n\
+php artisan migrate:fresh --force\n\
 \n\
 echo "Clearing caches..."\n\
 php artisan optimize:clear\n\
