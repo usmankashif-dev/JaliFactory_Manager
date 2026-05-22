@@ -79,7 +79,7 @@ RUN { \
     echo 'opcache.interned_strings_buffer=16'; \
 } > /usr/local/etc/php/conf.d/opcache.ini
 
-# Copy composer files first
+# Copy composer files
 COPY composer.json composer.lock* ./
 
 # Install PHP dependencies
@@ -128,11 +128,15 @@ set -e\n\
 \n\
 echo "Starting Laravel application..."\n\
 \n\
-echo "Clearing caches..."\n\
-php artisan optimize:clear\n\
+echo "Creating database tables if needed..."\n\
+php artisan cache:table || true\n\
+php artisan session:table || true\n\
 \n\
 echo "Running migrations..."\n\
 php artisan migrate --force\n\
+\n\
+echo "Clearing caches..."\n\
+php artisan optimize:clear\n\
 \n\
 echo "Caching config/routes/views..."\n\
 php artisan config:cache\n\
