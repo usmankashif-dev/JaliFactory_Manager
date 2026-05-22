@@ -7,6 +7,9 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
+# Set APP_URL for asset generation with HTTPS
+ENV APP_URL=https://jalifactory-manager.onrender.com
 RUN npm run build
 
 # PHP stage - Production ready Laravel Dockerfile
